@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Manifest e meta tags PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#4CAF50" />
+
+    <!-- iOS support -->
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <!-- CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css"
+      rel="stylesheet"
+    />
+
+    <!-- JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <title>Jogo da Memória - Alimentos</title>
+    <style>
+      body {
+        font-family: "Segoe UI", sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background: #f0f7f4;
+        color: #3c493f;
+      }
+
+      h1 {
+        color: #7e8d85;
+        margin-bottom: 5px;
+      }
+      p {
+        font-weight: 700;
+        color: rgba(0, 110, 255, 0.521);
+      }
+
+      #info-jogo {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 15px;
+      }
+
+      #tabuleiro {
+        display: grid;
+        grid-template-columns: repeat(6, 100px);
+        grid-template-rows: repeat(6, 100px);
+        gap: 10px;
+        perspective: 1000px;
+      }
+
+      .carta {
+        position: relative;
+        transform-style: preserve-3d;
+        transition: all 0.5s ease;
+        cursor: pointer;
+      }
+
+      .frente,
+      .verso {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        backface-visibility: hidden;
+        border-radius: 10px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 2.5rem;
+        box-shadow: 0 4px 8px rgba(189, 16, 16, 0.1);
+      }
+
+      .frente {
+        background: #ff00f2;
+        transform: rotateY(180deg);
+      }
+
+      .verso {
+        background: #3c493f;
+        color: white;
+      }
+
+      .virada {
+        transform: rotateY(180deg);
+      }
+      .par-acertado .frente {
+        box-shadow: 0 0 10px rgba(76, 175, 80, 0.6);
+        transition: all 0.3s ease;
+      }
+
+      /*   .encontrada {
+        opacity: 0.5;
+        cursor: default;
+      } */
+
+      .par-acertado .frente {
+        background: #e0f7e0; /* Verde bem claro */
+        opacity: 0.8; /* Leve transparência */
+        filter: saturate(0.5); /* Reduz a intensidade da cor */
+        border: 2px dashed #4caf50; /* Borda verde */
+      }
+
+      button {
+        margin-top: 20px;
+        padding: 10px 20px;
+        background: #7e8d85;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1rem;
+        transition: background 0.3s;
+      }
+
+      button:hover {
+        background: #3c493f;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Jogo da Memória</h1>
+    <div id="info-jogo">
+      <p>Jogadas: <span id="jogadas">0</span></p>
+      <p>Pares: <span id="pares">0</span>/18</p>
+    </div>
+    <div id="tabuleiro"></div>
+    <button id="reiniciar">Reiniciar Jogo</button>
+
+    <p>MM TecSolutions</p>
+
+    <script>
+      const emojis = [
+        "🍎",
+        "🍌",
+        "🍕",
+        "🥦",
+        "🍫",
+        "🍓",
+        "🥕",
+        "🍩",
+        "💵",
+        "🍔",
+        "🐰",
+        "🍉",
+        "🚗",
+        "🚀",
+        "⚽",
+        "🍙",
+        "🎁",
+        "🍭",
+      ];
+      let cartasViradas = [];
+      let jogadas = 0;
+      let paresEncontrados = 0;
+      let bloqueio = false;
+
+      function iniciarJogo() {
+        const tabuleiro = document.getElementById("tabuleiro");
+        tabuleiro.innerHTML = "";
+        jogadas = 0;
+        paresEncontrados = 0;
+        document.getElementById("jogadas").textContent = "0";
+        document.getElementById("pares").textContent = "0";
+
+        // Duplica e embaralha os emojis
+        const cartas = [...emojis, ...emojis].sort(() => Math.random() - 0.5);
+
+        cartas.forEach((emoji, index) => {
+          const carta = document.createElement("div");
+          carta.className = "carta";
+          carta.dataset.emoji = emoji;
+          carta.dataset.index = index;
+
+          const frente = document.createElement("div");
+          frente.className = "frente";
+          frente.textContent = emoji;
+
+          const verso = document.createElement("div");
+          verso.className = "verso";
+          verso.textContent = "?";
+
+          carta.appendChild(frente);
+          carta.appendChild(verso);
+
+          carta.addEventListener("click", virarCarta);
+          tabuleiro.appendChild(carta);
+        });
+      }
+
+      function virarCarta() {
+        if (
+          bloqueio ||
+          this.classList.contains("virada") ||
+          this.classList.contains("encontrada")
+        ) {
+          return;
+        }
+
+        this.classList.add("virada");
+        cartasViradas.push(this);
+
+        if (cartasViradas.length === 2) {
+          bloquearTabuleiro();
+          verificarPar();
+        }
+      }
+
+      function bloquearTabuleiro() {
+        bloqueio = true;
+        setTimeout(() => {
+          bloqueio = false;
+        }, 1000);
+      }
+
+      function verificarPar() {
+        jogadas++;
+        document.getElementById("jogadas").textContent = jogadas;
+
+        const [carta1, carta2] = cartasViradas;
+
+        if (carta1.dataset.emoji === carta2.dataset.emoji) {
+          // Animação de acerto
+          carta1.querySelector(".frente").classList.add("acerto");
+          carta2.querySelector(".frente").classList.add("acerto");
+
+          // Alerta personalizado
+          const emoji = carta1.dataset.emoji;
+          setTimeout(() => {
+            Swal.fire({
+              title: "Par encontrado!",
+              text: `🎉 Você acertou o par de ${emoji}!`,
+              icon: "success",
+              confirmButtonText: "OK",
+              background: "#e0f7e0",
+              color: "#2c3e50",
+              showConfirmButton: false, // Remove o botão de confirmação
+              timerProgressBar: true, // Barra de progresso para visualização
+              timer: 2000,
+            });
+          }, 300);
+
+          carta1.classList.add("encontrada");
+          carta2.classList.add("encontrada");
+          paresEncontrados++;
+          document.getElementById("pares").textContent = paresEncontrados;
+
+          // Remove a animação após terminar
+          setTimeout(() => {
+            carta1.querySelector(".frente").classList.remove("acerto");
+            carta2.querySelector(".frente").classList.remove("acerto");
+          }, 1000);
+
+          if (paresEncontrados === emojis.length) {
+            setTimeout(() => {
+              Swal.fire({
+                title: "🏆 Vitória!",
+                text: `Você completou o jogo em ${jogadas} jogadas!`,
+                icon: "success",
+                confirmButtonText: "🎉🎉🎉 Uhul!!!!",
+                timer: 8000,
+                timerProgressBar: true,
+                backdrop: `
+    rgba(0,0,123,0.4)
+    url("https://media.giphy.com/media/3o7abKhOpu0NwenH3O/giphy.gif")
+    center top
+    no-repeat
+  `,
+              });
+            }, 500);
+          }
+        } else {
+          setTimeout(() => {
+            carta1.classList.remove("virada");
+            carta2.classList.remove("virada");
+          }, 1000);
+        }
+
+        cartasViradas = [];
+      }
+
+      document
+        .getElementById("reiniciar")
+        .addEventListener("click", iniciarJogo);
+
+      // Inicia o jogo quando a página carrega
+      window.onload = iniciarJogo;
+    </script>
+
+    <script>
+      // Registrar Service Worker
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker
+            .register("/sw.js")
+            .then((reg) => console.log("SW registrado:", reg.scope))
+            .catch((err) => console.log("SW falhou:", err));
+        });
+      }
+
+      // Evento de instalação
+      let deferredPrompt;
+      window.addEventListener("beforeinstallprompt", (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        // Mostrar botão de instalação
+        const installBtn = document.createElement("button");
+        installBtn.textContent = "Instalar App";
+        installBtn.className = "install-btn";
+        installBtn.onclick = () => {
+          deferredPrompt.prompt();
+          deferredPrompt.userChoice.then(() => {
+            deferredPrompt = null;
+          });
+        };
+        document.body.appendChild(installBtn);
+      });
+    </script>
+
+    <style>
+      .install-btn {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        padding: 10px 15px;
+        background: #4caf50;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        z-index: 100;
+      }
+    </style>
+  </body>
+</html>
